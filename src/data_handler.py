@@ -9,7 +9,7 @@ class DataHandler:
     n_classes: количество классов фаций
     random_state: seed для воспроизводимости результатов"""
     
-    def __init__(self, n_samples=1000, n_features=3, n_classes=3, random_state=42):
+    def __init__(self, n_samples=1000, n_features=5, n_classes=3, random_state=42):
         self.n_samples = n_samples
         self.n_features = n_features
         self.n_classes = n_classes
@@ -39,7 +39,11 @@ class DataHandler:
         X[n0+n1:, 1] = np.random.normal(0.5, 0.2, n2)
         y[n0+n1:] = 2
         
-        # Нормализация данных
+        # Генерация дополнительных атрибутов как комбинаций основных
+        for i in range(3, self.n_features):
+            X[:, i] = np.random.rand(self.n_samples) * 0.5 + X[:, i-3] * 0.5
+
+        # Нормализация данных к диапазону [0, 1]
         X = (X - np.min(X, axis=0)) / (np.max(X, axis=0) - np.min(X, axis=0))
         
         # Добавление шума

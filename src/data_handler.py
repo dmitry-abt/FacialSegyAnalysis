@@ -86,3 +86,29 @@ class DataHandler:
         plt.suptitle('Распределение сейсмических атрибутов по классам фаций', y=1.02)
         plt.tight_layout()
         plt.show()
+
+    def train_test_split(self, X, y, test_size=0.2, random_state=42):
+        """
+        Разделение данных на обучающую и тестовую выборки
+        
+        Параметры:
+        X: входные данные
+        y: метки
+        test_size: доля тестовых данных
+        random_state: seed для воспроизводимости
+        
+        Возвращает:
+        X_train, X_test, y_train, y_test: разделенные данные
+        """
+        np.random.seed(random_state)
+        n_samples = X.shape[0]
+        n_test = int(n_samples * test_size)
+        
+        # Перемешивание индексов
+        indices = np.random.permutation(n_samples)
+        
+        # Разделение на обучающую и тестовую выборки
+        test_indices = indices[:n_test]
+        train_indices = indices[n_test:]
+        
+        return X[train_indices], X[test_indices], y[train_indices], y[test_indices]

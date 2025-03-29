@@ -1,7 +1,11 @@
+from data_handler import DataHandler
+
 def main():
     # Генерация данных
     print("Генерация синтетических данных")
-    
+    data_handler = DataHandler(n_samples=1500, n_features=3, n_classes=3)
+    X, y = data_handler.generate_synthetic_data()
+
     # Визуализация данных
     print("\nВизуализация данных до классификации")
     

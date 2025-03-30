@@ -44,6 +44,7 @@ def main():
 
     # Визуализация результатов
     print("\nВизуализация результатов")
+    model.plot_predictions(X_test, y_test, feature_indices=(0, 1))
 
 if __name__ == "__main__":
     main()

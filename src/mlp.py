@@ -383,6 +383,34 @@ class MLP:
         plt.tight_layout()
         plt.show()
 
+    def plot_predictions(self, X, y_true, feature_indices=(0, 1)):
+        """
+        Визуализация результатов модели
+        
+        Параметры:
+        X: входные данные
+        y_true: истинные метки
+        feature_indices: индексы признаков для визуализации
+        """
+        # Получение результатов
+        y_pred = self.predict(X)
+        
+        plt.figure(figsize=(12, 6))
+        
+        # Визуализация истинных классов
+        plt.scatter(X[:, feature_indices[0]], X[:, feature_indices[1]], 
+                    c=y_true, cmap='viridis', alpha=0.6, label='Истинные классы')
+        
+        # Визуализация предсказанных классов (крестиками)
+        plt.scatter(X[:, feature_indices[0]], X[:, feature_indices[1]], 
+                    c=y_pred, cmap='viridis', alpha=0.6, marker='x', label='Предсказанные классы')
+        
+        plt.title('Сравнение истинных и предсказанных классов фаций')
+        plt.xlabel(f'Атрибут {feature_indices[0]+1}')
+        plt.ylabel(f'Атрибут {feature_indices[1]+1}')
+        plt.legend()
+        plt.show()
+
     # Функции активации и их производные
     
     def relu(self, x):

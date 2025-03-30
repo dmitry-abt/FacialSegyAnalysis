@@ -36,7 +36,8 @@ def main():
 
     # Визуализация обучения
     print("\nВизуализация кривой обучения")
-    
+    model.plot_learning_curve(history)
+
     # Оценка модели
     print("\nОценка модели на тестовых данных")
     test_accuracy = model.evaluate(X_test, y_test)

@@ -351,6 +351,38 @@ class MLP:
         plt.ylabel('Истинные классы')
         plt.show()
     
+    def plot_learning_curve(self, history):
+        """
+        Визуализация кривой обучения
+        
+        Параметры:
+        history: словарь с историей обучения
+        """
+        plt.figure(figsize=(12, 5))
+        
+        # График потерь
+        plt.subplot(1, 2, 1)
+        plt.plot(history['train_loss'], label='Обучающая выборка')
+        if 'val_loss' in history:
+            plt.plot(history['val_loss'], label='Валидационная выборка')
+        plt.title('Функция потерь по эпохам')
+        plt.xlabel('Эпохи')
+        plt.ylabel('Потери')
+        plt.legend()
+        
+        # График точности
+        plt.subplot(1, 2, 2)
+        plt.plot(history['train_acc'], label='Обучающая выборка')
+        if 'val_acc' in history:
+            plt.plot(history['val_acc'], label='Валидационная выборка')
+        plt.title('Точность по эпохам')
+        plt.xlabel('Эпохи')
+        plt.ylabel('Точность')
+        plt.legend()
+        
+        plt.tight_layout()
+        plt.show()
+
     # Функции активации и их производные
     
     def relu(self, x):

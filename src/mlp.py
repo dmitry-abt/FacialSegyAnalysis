@@ -1,4 +1,7 @@
 import numpy as np
+import seaborn as sns
+from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
 
 class MLP:
     """
@@ -324,6 +327,29 @@ class MLP:
         self.plot_confusion_matrix(y_true, y_pred)
         
         return accuracy
+    
+    def plot_confusion_matrix(self, y_true, y_pred):
+        """
+        Визуализация матрицы ошибок
+        
+        Параметры:
+        y_true: истинные метки
+        y_pred: предсказанные метки
+        """
+        cm = confusion_matrix(y_true, y_pred)
+        plt.figure(figsize=(8, 6))
+        
+        # Аннотации для классов
+        class_names = ['Песчаник', 'Глина', 'Карбонат']
+        
+        # Построение тепловой карты матрицы ошибок
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                    xticklabels=class_names, yticklabels=class_names)
+        
+        plt.title('Матрица ошибок классификации')
+        plt.xlabel('Предсказанные классы')
+        plt.ylabel('Истинные классы')
+        plt.show()
     
     # Функции активации и их производные
     

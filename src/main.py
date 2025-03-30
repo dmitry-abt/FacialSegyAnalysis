@@ -31,6 +31,9 @@ def main():
                 learning_rate=0.01,         # Скорость обучения
                 optimizer='adam')           # Оптимизатор Adam
 
+    # Обучение модели (100 эпох, размер батча 32)
+    history = model.train(X_train, y_train, X_val, y_val, epochs=100, batch_size=32)
+
     # Визуализация обучения
     print("\nВизуализация кривой обучения")
     

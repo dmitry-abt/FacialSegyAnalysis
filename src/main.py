@@ -1,4 +1,6 @@
 from data_handler import DataHandler
+from mlp import MLP
+import numpy as np
 
 def main():
     # Генерация данных
@@ -18,6 +20,16 @@ def main():
 
     # Создание и обучение модели
     print("\nСоздание и обучение нейронной сети")
+    input_size = X_train.shape[1]
+    output_size = len(np.unique(y_train))
+    
+    # Инициализация модели
+    model = MLP(input_size=input_size, 
+                hidden_sizes=[64, 32],      # Два скрытых слоя с 64 и 32 нейронами
+                output_size=output_size,    # Три выходных нейрона для трех классов
+                activation='relu',          # Функция активации скрытых слоев
+                learning_rate=0.01,         # Скорость обучения
+                optimizer='adam')           # Оптимизатор Adam
 
     # Визуализация обучения
     print("\nВизуализация кривой обучения")

@@ -1,6 +1,5 @@
 import numpy as np
 import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 
 class MLP:

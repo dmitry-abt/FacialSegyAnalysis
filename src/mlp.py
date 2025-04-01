@@ -327,6 +327,24 @@ class MLP:
         
         return accuracy
 
+    def confusion_matrix(self, y_true, y_pred, n_classes):
+        """
+        Матрица ошибок
+        
+        Параметры:
+        y_true: истинные метки
+        y_pred: предсказанные метки
+        n_classes: количество классов фаций
+
+        Возвращает:
+        Матрицу ошибок
+        """
+        cm = np.zeros((n_classes, n_classes), dtype=int)
+        for t, p in zip(y_true, y_pred):
+            cm[t, p] += 1
+
+        return cm
+
     def print_classification_report(self, y_true, y_pred):
         """
         Отчет о классификации
@@ -339,9 +357,7 @@ class MLP:
         n_classes = len(classes)
         
         # Матрица ошибок
-        cm = np.zeros((n_classes, n_classes), dtype=int)
-        for t, p in zip(y_true, y_pred):
-            cm[t, p] += 1
+        cm = self.confusion_matrix(y_true, y_pred, n_classes)
         
         # Расчет метрик
         # Заголовок отчета
@@ -377,10 +393,9 @@ class MLP:
         class_names = ['Песчаник', 'Глина', 'Карбонат']
         n_classes = len(class_names)
 
-        cm = np.zeros((n_classes, n_classes), dtype=int)
-        for t, p in zip(y_true, y_pred):
-            cm[t, p] += 1
-        
+        # Матрица ошибок
+        cm = self.confusion_matrix(y_true, y_pred, n_classes)
+                
         plt.figure(figsize=(8, 6))
         
         # Построение тепловой карты матрицы ошибок

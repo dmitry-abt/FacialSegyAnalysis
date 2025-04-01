@@ -336,11 +336,16 @@ class MLP:
         y_true: истинные метки
         y_pred: предсказанные метки
         """
-        cm = confusion_matrix(y_true, y_pred)
-        plt.figure(figsize=(8, 6))
         
         # Аннотации для классов
         class_names = ['Песчаник', 'Глина', 'Карбонат']
+        n_classes = len(class_names)
+
+        cm = np.zeros((n_classes, n_classes), dtype=int)
+        for t, p in zip(y_true, y_pred):
+            cm[t, p] += 1
+        
+        plt.figure(figsize=(8, 6))
         
         # Построение тепловой карты матрицы ошибок
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 

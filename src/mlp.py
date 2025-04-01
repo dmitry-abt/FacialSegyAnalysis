@@ -321,13 +321,50 @@ class MLP:
         
         # Отчет о классификации
         print("\nОтчет о классификации:")
-        print(classification_report(y_true, y_pred, target_names=['Песчаник', 'Глина', 'Карбонат']))
-        
+        self.print_classification_report(y_true, y_pred)
+
         # Визуализация матрицы ошибок
         self.plot_confusion_matrix(y_true, y_pred)
         
         return accuracy
-    
+
+    def print_classification_report(self, y_true, y_pred):
+        """
+        Отчет о классификации
+        
+        Параметры:
+        y_true: истинные метки
+        y_pred: предсказанные метки
+        """
+        classes = np.unique(y_true)
+        n_classes = len(classes)
+        
+        # Матрица ошибок
+        cm = np.zeros((n_classes, n_classes), dtype=int)
+        for t, p in zip(y_true, y_pred):
+            cm[t, p] += 1
+        
+        # Расчет метрик
+        # Заголовок отчета
+        print("{:10s} {:>10s} {:>10s} {:>10s} {:>10s}".format(
+            "Класс", "Precision", "Recall", "F1-score", "Support"))
+
+        # Расчет и вывод метрик для каждого класса
+        for i in range(n_classes):
+            tp = cm[i, i]               # True positives
+            fp = np.sum(cm[:, i]) - tp  # False positives
+            fn = np.sum(cm[i, :]) - tp  # False negatives
+            
+            # Расчет precision, recall, f1-score
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+            support = np.sum(y_true == i)
+            
+            # Вывод строки отчета
+            print("{:10s} {:10.2f} {:10.2f} {:10.2f} {:10d}".format(
+                str(i), precision, recall, f1, support))
+
     def plot_confusion_matrix(self, y_true, y_pred):
         """
         Визуализация матрицы ошибок

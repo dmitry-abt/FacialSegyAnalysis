@@ -1,8 +1,32 @@
+from matplotlib import pyplot as plt
 from data_handler import DataHandler
 from mlp import MLP
 import numpy as np
+import segyio
 
 def main():
+
+    # Открываем SEG-Y файл
+    file_path = "/Users/developer/Downloads/adele_seismic_survey_NW_australia_bind_cube_fault_detection.segy"
+
+    with segyio.open(file_path, "r") as segyfile:
+        seismic_data = segyio.tools.cube(segyfile)  # Загружаем данные в массив
+
+    # Визуализируем один из разрезов
+    plt.imshow(seismic_data[:, :, 0], cmap='gray', aspect='auto')
+    plt.colorbar(label='Амплитуда')
+    plt.title('Сейсмический разрез')
+    plt.show()
+
+    # Получение размерностей
+    num_ilines = len(segyfile.ilines)
+    num_xlines = len(segyfile.xlines)
+
+    print(f'Количество ILINE: {num_ilines}')
+    print(f'Количество XLINE: {num_xlines}')
+
+
+    """
     # Генерация данных
     print("Генерация синтетических данных")
     data_handler = DataHandler(n_samples=1500, n_features=5, n_classes=3)
@@ -44,7 +68,8 @@ def main():
 
     # Визуализация результатов
     print("\nВизуализация результатов")
-    model.plot_predictions(X_test, y_test, feature_indices=(0, 1))
+    model.plot_predictions(X_test, y_test, feature_indices=(0, 1))"
+    """
 
 if __name__ == "__main__":
     main()

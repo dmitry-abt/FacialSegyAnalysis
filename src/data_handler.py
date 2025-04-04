@@ -90,32 +90,59 @@ class DataHandler:
         plt.tight_layout()
         plt.show()
 
-    def train_test_split(self, X, y, test_size=0.2, random_state=42):
+    def train_test_split(self, X, y, test_size=0.2, stratify=None, random_state=None):
         """
         Разделение данных на обучающую и тестовую выборки
         
         Параметры:
         X: входные данные
         y: метки
-        test_size: доля тестовых данных
+        test_size: доля тестовых данных  
+        stratify: если не None, сохраняет распределение классов
         random_state: seed для воспроизводимости
         
         Возвращает:
         X_train, X_test, y_train, y_test: разделенные данные
         """
-        np.random.seed(random_state)
-        n_samples = X.shape[0]
+        if random_state is not None:
+            np.random.seed(random_state)
+    
+        n_samples = len(X)
         n_test = int(n_samples * test_size)
         
-        # Перемешивание индексов
-        indices = np.random.permutation(n_samples)
+        if stratify is not None:
+            # Стратифицированное разбиение
+            classes, class_counts = np.unique(stratify, return_counts=True)
+            test_counts = (class_counts * test_size).astype(int)
+            
+            test_indices = []
+            train_indices = []
+            
+            for cls, test_count in zip(classes, test_counts):
+                cls_indices = np.where(y == cls)[0]
+                np.random.shuffle(cls_indices)
+                
+                test_indices.extend(cls_indices[:test_count])
+                train_indices.extend(cls_indices[test_count:])
+            
+            np.random.shuffle(test_indices)
+            np.random.shuffle(train_indices)
+        else:
+            # Случайное разбиение
+            indices = np.arange(n_samples)
+            np.random.shuffle(indices)
+            
+            test_indices = indices[:n_test]
+            train_indices = indices[n_test:]
         
-        # Разделение на обучающую и тестовую выборки
-        test_indices = indices[:n_test]
-        train_indices = indices[n_test:]
+        # Разделение данных
+        X_train = X[train_indices]
+        X_test = X[test_indices]
+        y_train = y[train_indices]
+        y_test = y[test_indices]
         
-        return X[train_indices], X[test_indices], y[train_indices], y[test_indices]
-    
+        return X_train, X_test, y_train, y_test
+
     def load_segy_data(self, filepath, inline_range=None, xline_range=None, sample_range=None):
         """Загрузка 3D сейсмических данных из SEG-Y"""
         with segyio.open(filepath, "r", strict=False) as segyfile:

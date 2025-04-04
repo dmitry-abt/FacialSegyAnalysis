@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 class MLP:
     """
     Многослойный перцептрон (MLP) для классификации сейсмических фаций
+    
+    Параметры:
+    layer_sizes - список размеров слоев (входной, скрытые, выходной)
+    activation - функция активации ('leaky_relu' или 'relu')
     """
     def __init__(self, layer_sizes, activation='leaky_relu'):
         self.layer_sizes = layer_sizes
@@ -14,10 +18,14 @@ class MLP:
         self._initialize_parameters()
 
     def _initialize_parameters(self):
+        """Инициализация весов и смещений для всех слоев сети"""
         for i in range(1, len(self.layer_sizes)):
-            std = np.sqrt(2 / self.layer_sizes[i-1])
+            # Инициализация весов методом He
+            std = np.sqrt(2 / self.layer_sizes[i-1])  # Стандартное отклонение
             self.parameters[f'W{i}'] = np.random.randn(self.layer_sizes[i-1], self.layer_sizes[i]) * std
             self.parameters[f'b{i}'] = np.zeros((1, self.layer_sizes[i]))
+            
+            # Инициализация параметров batch normalization для скрытых слоев
             if i < len(self.layer_sizes)-1:
                 self.parameters[f'gamma{i}'] = np.ones((1, self.layer_sizes[i]))
                 self.parameters[f'beta{i}'] = np.zeros((1, self.layer_sizes[i]))
@@ -25,54 +33,93 @@ class MLP:
                 self.parameters[f'running_var{i}'] = np.ones((1, self.layer_sizes[i]))
     
     def forward(self, X, training=True, dropout_rate=0.3):
-        cache = {'A0': X}
-        L = len([k for k in self.parameters if k.startswith('W')])
+        """
+        Прямой проход через сеть
+        
+        Параметры:
+        X - входные данные
+        training - флаг обучения (для dropout и batch norm)
+        dropout_rate - вероятность отключения нейрона
+        
+        Возвращает:
+        Выход сети и кэш промежуточных значений
+        """
+        cache = {'A0': X}  # Кэш для хранения промежуточных значений
+        L = len([k for k in self.parameters if k.startswith('W')])  # Число слоев
         
         for l in range(1, L+1):
+            # Линейное преобразование
             Z = cache[f'A{l-1}'].dot(self.parameters[f'W{l}']) + self.parameters[f'b{l}']
             cache[f'Z{l}'] = Z
             
+            # Batch normalization и активация для скрытых слоев
             if l < L and f'gamma{l}' in self.parameters:
                 if training:
+                    # Вычисление статистик по батчу
                     mean, var = np.mean(Z, axis=0), np.var(Z, axis=0)
                     self.parameters[f'running_mean{l}'] = mean
                     self.parameters[f'running_var{l}'] = var
                 else:
+                    # Использование накопленных статистик
                     mean = self.parameters[f'running_mean{l}']
                     var = self.parameters[f'running_var{l}']
                 
+                # Нормализация
                 Z_norm = (Z - mean) / np.sqrt(var + 1e-8)
                 Z = self.parameters[f'gamma{l}'] * Z_norm + self.parameters[f'beta{l}']
                 cache[f'Z_norm{l}'] = Z_norm
                 
+                # Dropout (только при обучении)
                 if training and dropout_rate > 0:
                     mask = (np.random.rand(*Z.shape) > dropout_rate) / (1 - dropout_rate)
                     Z *= mask
                 
+                # Применение функции активации
                 cache[f'A{l}'] = self.leaky_relu(Z) if self.activation == 'leaky_relu' else np.maximum(0, Z)
             else:
+                # Выходной слой с softmax
                 cache[f'A{L}'] = self.softmax(Z)
         
         return cache[f'A{L}'], cache
     
     def backward(self, X, y, cache, sample_weights=None, l2_lambda=0.001):
-        gradients = {}
-        m = X.shape[0]
-        L = len([k for k in self.parameters if k.startswith('W')])
+        """
+        Обратный проход - вычисление градиентов
         
+        Параметры:
+        X - входные данные
+        y - истинные метки
+        cache - кэш из forward pass
+        sample_weights - веса примеров
+        l2_lambda - коэффициент L2-регуляризации
+        
+        Возвращает:
+        Словарь градиентов для всех параметров
+        """
+        gradients = {}
+        m = X.shape[0]  # Размер батча
+        L = len([k for k in self.parameters if k.startswith('W')])  # Число слоев
+        
+        # Градиент на выходном слое (кросс-энтропия + softmax)
         dZL = cache[f'A{L}'].copy()
         dZL[range(m), y] -= 1
+        
+        # Взвешивание ошибок (для балансировки классов)
         if sample_weights is not None:
             dZL = (dZL.T * sample_weights).T / np.mean(sample_weights)
         else:
             dZL /= m
         
+        # Градиенты для выходного слоя
         gradients[f'dW{L}'] = cache[f'A{L-1}'].T.dot(dZL) + l2_lambda*self.parameters[f'W{L}']
         gradients[f'db{L}'] = np.sum(dZL, axis=0, keepdims=True)
         
+        # Обратное распространение по слоям
         for l in reversed(range(1, L)):
+            # Градиент от следующего слоя
             dA = dZL.dot(self.parameters[f'W{l+1}'].T)
             
+            # Градиенты для параметров batch norm
             if f'gamma{l}' in self.parameters:
                 gradients[f'dgamma{l}'] = np.sum(dA * cache[f'Z_norm{l}'], axis=0, keepdims=True)
                 gradients[f'dbeta{l}'] = np.sum(dA, axis=0, keepdims=True)
@@ -80,14 +127,16 @@ class MLP:
             else:
                 dZ = dA
             
+            # Градиент через функцию активации
             if self.activation == 'leaky_relu':
                 dZ = dZ * self.leaky_relu_derivative(cache[f'Z{l}'])
             else:
                 dZ = dZ * (cache[f'Z{l}'] > 0).astype(float)
             
+            # Градиенты для весов и смещений
             gradients[f'dW{l}'] = cache[f'A{l-1}'].T.dot(dZ) + l2_lambda*self.parameters[f'W{l}']
             gradients[f'db{l}'] = np.sum(dZ, axis=0, keepdims=True)
-            dZL = dZ
+            dZL = dZ  # Передача градиента следующему слою
         
         return gradients
     
@@ -155,25 +204,45 @@ class MLP:
     def train(self, X_train, y_train, X_val=None, y_val=None, 
               epochs=500, batch_size=256, initial_lr=0.01, min_lr=0.0001,
               patience=50, verbose=True):
+        """
+        Обучение модели
         
+        Параметры:
+        X_train, y_train - обучающие данные
+        X_val, y_val - валидационные данные (опционально)
+        epochs - число эпох
+        batch_size - размер батча
+        initial_lr, min_lr - начальная и минимальная скорость обучения
+        patience - число эпох для ранней остановки
+        verbose - вывод прогресса
+        """
+        # Вычисление весов классов для балансировки
         class_weights_dict = self.compute_class_weights(y_train)
         sample_weights = np.array([class_weights_dict[y] for y in y_train])
         
+        # Инициализация моментов для Adam
         m = {k: np.zeros_like(v) for k, v in self.parameters.items()}
         v = {k: np.zeros_like(v) for k, v in self.parameters.items()}
         beta1, beta2, eps = 0.9, 0.999, 1e-8
+        
+        # Переменные для ранней остановки
         best_val_acc, wait = 0, 0
         best_params = None
         
         for epoch in range(epochs):
+            # Уменьшение скорости обучения (cosine decay)
             lr = min_lr + 0.5*(initial_lr - min_lr)*(1 + np.cos(epoch/epochs*np.pi))
             
+            # Перемешивание данных
             idx = np.random.permutation(len(X_train))
+            
+            # Обучение по мини-батчам
             for i in range(0, len(X_train), batch_size):
                 batch_idx = idx[i:i+batch_size]
                 X_batch, y_batch = X_train[batch_idx], y_train[batch_idx]
                 weights_batch = sample_weights[batch_idx]
                 
+                # Прямой и обратный проход
                 AL, cache = self.forward(X_batch, training=True)
                 grads = self.backward(X_batch, y_batch, cache, weights_batch)
                 
@@ -185,6 +254,7 @@ class MLP:
                 
                 clip_coef = min(1.0, 1.0/(total_norm + 1e-6))
                 
+                # Обновление параметров с Adam
                 for k in self.parameters:
                     if k.startswith(('W', 'b', 'gamma', 'beta')):
                         grads[f'd{k}'] *= clip_coef
@@ -194,6 +264,7 @@ class MLP:
                         v_hat = v[k]/(1 - beta2**(epoch+1))
                         self.parameters[k] -= lr * m_hat/(np.sqrt(v_hat) + eps)
             
+            # Оценка на обучающей выборке
             train_pred = np.argmax(self.forward(X_train, training=False)[0], axis=1)
             train_acc = np.mean(train_pred == y_train)
             train_loss = self.cross_entropy_loss(y_train, self.forward(X_train, training=False)[0], sample_weights)
@@ -201,6 +272,7 @@ class MLP:
             self.history['train_loss'].append(train_loss)
             self.history['train_acc'].append(train_acc)
             
+            # Оценка на валидационной выборке
             if X_val is not None:
                 val_pred = np.argmax(self.forward(X_val, training=False)[0], axis=1)
                 val_acc = np.mean(val_pred == y_val)
@@ -209,6 +281,7 @@ class MLP:
                 self.history['val_loss'].append(val_loss)
                 self.history['val_acc'].append(val_acc)
                 
+                # Проверка для ранней остановки
                 if val_acc > best_val_acc:
                     best_val_acc = val_acc
                     best_params = {k: v.copy() for k, v in self.parameters.items()}
@@ -221,6 +294,7 @@ class MLP:
                             print(f"\nРанняя остановка на эпохе {epoch+1}")
                         break
             
+            # Вывод прогресса обучения
             if verbose and (epoch % 10 == 0 or epoch == epochs-1):
                 msg = f"Эпоха {epoch+1}/{epochs}: LR={lr:.5f}, Train Loss={train_loss:.4f}, Acc={train_acc:.4f}"
                 if X_val is not None:
@@ -471,12 +545,15 @@ class MLP:
         return one_hot
 
     def leaky_relu(self, x, alpha=0.01):
+        """Функция активации Leaky ReLU"""
         return np.where(x > 0, x, alpha * x)
 
     def leaky_relu_derivative(self, x, alpha=0.01):
+        """Производная функции Leaky ReLU"""
         return np.where(x > 0, 1, alpha)
 
     def compute_class_weights(self, y):
+        """Вычисление весов классов для балансировки"""
         classes, counts = np.unique(y, return_counts=True)
         n_samples = len(y)
         n_classes = len(classes)

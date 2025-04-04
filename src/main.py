@@ -1,50 +1,94 @@
-from data_handler import DataHandler
+from matplotlib import pyplot as plt
+from data_handler import DataHandler, PCA, RobustScaler
 from mlp import MLP
 import numpy as np
+import matplotlib.colors as mcolors
+import seaborn as sns
 
 def main():
-    # Генерация данных
-    print("Генерация синтетических данных")
-    data_handler = DataHandler(n_samples=1500, n_features=5, n_classes=3)
-    X, y = data_handler.generate_synthetic_data()
-
-    # Визуализация данных
-    print("\nВизуализация данных до классификации")
-    feature_names = ['Амплитуда', 'Частота', 'Анизотропия', 'Атрибут 4', 'Атрибут 5']
-    data_handler.plot_features(X, y, feature_names)
+    # Конфигурация
+    SEGY_PATH = "/Users/developer/Downloads/adele_seismic_survey_NW_australia_bind_cube_fault_detection.segy"
+    INLINE_RANGE = (155, 200, 1)  # Старт, стоп, шаг
+    XLINE_RANGE = (155, 200, 1)
+    SAMPLE_RANGE = (0, 50, 1)
+    WELL_LOCATIONS = [(10, 20), (40, 10)]
     
-    # Разделение данных (60% обучение / 20% валидация / 20% тест)
-    print("\nРазделение данных на обучающую и тестовую выборки")
-    X_train, X_test, y_train, y_test = data_handler.train_test_split(X, y, test_size=0.2)
-    X_train, X_val, y_train, y_val = data_handler.train_test_split(X_train, y_train, test_size=0.25) 
+    dataHandler = DataHandler()
 
-    # Создание и обучение модели
-    print("\nСоздание и обучение нейронной сети")
-    input_size = X_train.shape[1]
-    output_size = len(np.unique(y_train))
+    # Загрузка данных
+    print("Загрузка SEG-Y данных")
+    seismic_data = dataHandler.load_segy_data(SEGY_PATH, INLINE_RANGE, XLINE_RANGE, SAMPLE_RANGE)
+    dataHandler.plot_3d_seismic(seismic_data)
+    dataHandler.plot_section(seismic_data, 0, "Исходные сейсмические данные")
     
-    # Инициализация модели
-    model = MLP(input_size=input_size, 
-                hidden_sizes=[64, 32],      # Два скрытых слоя с 64 и 32 нейронами
-                output_size=output_size,    # Три выходных нейрона для трех классов
-                activation='relu',          # Функция активации скрытых слоев
-                learning_rate=0.01,         # Скорость обучения
-                optimizer='adam')           # Оптимизатор Adam
-
-    # Обучение модели (100 эпох, размер батча 32)
-    history = model.train(X_train, y_train, X_val, y_val, epochs=100, batch_size=32)
-
-    # Визуализация обучения
-    print("\nВизуализация кривой обучения")
-    model.plot_learning_curve(history)
-
-    # Оценка модели
-    print("\nОценка модели на тестовых данных")
-    test_accuracy = model.evaluate(X_test, y_test)
-
-    # Визуализация результатов
-    print("\nВизуализация результатов")
-    model.plot_predictions(X_test, y_test, feature_indices=(0, 1))
+    # Расчет атрибутов
+    print("\nРасчет сейсмических атрибутов")
+    attributes = dataHandler.enhanced_attributes(seismic_data)
+    
+    # Загрузка фаций
+    print("\nЗагрузка данных по фациям")
+    facies = dataHandler.load_facies(seismic_data.shape, WELL_LOCATIONS)
+    dataHandler.plot_3d_facies(facies)
+    dataHandler.plot_section(facies, 0, "Исходные фации", cmap=mcolors.ListedColormap(['black', 'red', 'green', 'blue']))
+    
+    # Подготовка данных
+    print("\nПодготовка данных для обучения")
+    X = attributes.reshape(-1, attributes.shape[-1])
+    y = facies.reshape(-1)
+    valid_idx = y != -1
+    X, y = X[valid_idx], y[valid_idx]
+    
+    # Балансировка классов
+    X_res, y_res = dataHandler.simple_oversample(X, y)
+    
+    # Метод анализа главных компонент
+    pca = PCA(n_components=0.95)
+    X_reduced = pca.fit_transform(RobustScaler().fit_transform(X_res))
+    print(f"Уменьшено с {X.shape[1]} до {pca.n_components_} признаков")
+    
+    # Разделение данных
+    X_train, X_val, y_train, y_val = dataHandler.train_test_split(
+        X_reduced, y_res, test_size=0.2, stratify=y_res, random_state=42)
+    
+    # Обучение модели
+    print("\nСоздание и обучение модели")
+    model = MLP(
+        layer_sizes=[X_reduced.shape[1], 1024, 512, 256, 128, len(np.unique(y_res))],
+        activation='leaky_relu'
+    )
+    
+    history = model.train(
+        X_train, y_train, X_val, y_val,
+        epochs=200,
+        batch_size=256,
+        initial_lr=0.01,
+        min_lr=0.0001,
+        patience=50
+    )
+    
+    # Оценка результатов
+    print("\nОценка модели:")
+    dataHandler.plot_history(history)
+    
+    y_pred = np.argmax(model.forward(X_val, training=False)[0], axis=1)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(model.confusion_matrix(y_val, y_pred, len(np.unique(y_res))), annot=True, fmt='d', cmap='Blues')
+    plt.title('Матрица ошибок')
+    plt.show()
+    
+    print(model.print_classification_report(y_val, y_pred))
+    
+    # Применение ко всему объему
+    print("\nПрименение модели ко всему объему данных")
+    X_full = pca.transform(RobustScaler().fit_transform(
+        attributes.reshape(-1, attributes.shape[-1])))
+    preds = np.argmax(model.forward(X_full, training=False)[0], axis=1)
+    
+    predicted_facies = np.full(facies.shape, -1, dtype=int)
+    predicted_facies.reshape(-1)[valid_idx] = preds[:np.sum(valid_idx)]
+    dataHandler.plot_3d_facies(predicted_facies)
+    dataHandler.plot_section(predicted_facies, 10, "Предсказанные фации",
+                cmap=mcolors.ListedColormap(['black', 'red', 'green', 'blue']))
 
 if __name__ == "__main__":
     main()

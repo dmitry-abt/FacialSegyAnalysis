@@ -277,3 +277,28 @@ class DataHandler:
         ax2.legend()
         
         plt.show()
+
+    def simple_oversample(self, X, y):
+        """Балансировка классовs"""
+        classes = np.unique(y)
+        class_counts = [sum(y == c) for c in classes]
+        max_count = max(class_counts)
+        
+        X_resampled = []
+        y_resampled = []
+        
+        for c in classes:
+            # Индексы текущего класса
+            idx = np.where(y == c)[0]
+            # Сколько нужно добавить примеров
+            need = max_count - len(idx)
+            # Случайно выбираем существующие примеры для дублирования
+            dup_idx = np.random.choice(idx, size=need)
+            
+            # Добавляем оригинальные и дублированные примеры
+            X_resampled.append(X[idx])
+            X_resampled.append(X[dup_idx])
+            y_resampled.append(y[idx])
+            y_resampled.append(y[dup_idx])
+        
+        return np.concatenate(X_resampled), np.concatenate(y_resampled)

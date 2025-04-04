@@ -302,3 +302,67 @@ class DataHandler:
             y_resampled.append(y[dup_idx])
         
         return np.concatenate(X_resampled), np.concatenate(y_resampled)
+
+class RobustScaler:
+    def __init__(self, quantile_range=(25.0, 75.0)):
+        self.quantile_range = quantile_range
+        self.center_ = None
+        self.scale_ = None
+    
+    def fit(self, X):
+        # Вычисляем медиану как центр
+        self.center_ = np.median(X, axis=0)
+        
+        # Вычисляем интерквартильный размах (IQR) как масштаб
+        q_min, q_max = np.percentile(X, self.quantile_range, axis=0)
+        self.scale_ = q_max - q_min
+        
+        # Защита от нулевого масштаба
+        self.scale_[self.scale_ == 0] = 1.0
+        return self
+    
+    def transform(self, X):
+        return (X - self.center_) / self.scale_
+    
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+class PCA:
+    """Анализ главных компонент с поддержкой n_components в долях"""
+    def __init__(self, n_components=None):
+        self.n_components = n_components
+        self.components_ = None
+        self.mean_ = None
+        self.explained_variance_ratio_ = None
+    
+    def fit(self, X):
+        # Центрирование данных
+        self.mean_ = np.mean(X, axis=0)
+        X_centered = X - self.mean_
+        
+        # Сингулярное разложение
+        _, s, Vt = np.linalg.svd(X_centered, full_matrices=False)
+        
+        # Объясненная дисперсия
+        explained_variance = (s ** 2) / (X.shape[0] - 1)
+        total_variance = explained_variance.sum()
+        self.explained_variance_ratio_ = explained_variance / total_variance
+        
+        # Автоматический выбор числа компонент
+        if isinstance(self.n_components, float):
+            cumulative_variance = np.cumsum(self.explained_variance_ratio_)
+            self.n_components_ = np.argmax(cumulative_variance >= self.n_components) + 1
+        else:
+            self.n_components_ = self.n_components or X.shape[1]
+        
+        # Сохраняем главные компоненты
+        self.components_ = Vt[:self.n_components_]
+        return self
+    
+    def transform(self, X):
+        X_centered = X - self.mean_
+        return X_centered @ self.components_.T
+    
+    def fit_transform(self, X):
+        self.fit(X)
+        return self.transform(X)
